@@ -2,9 +2,10 @@
 
 namespace App\Mcp\Tools;
 
-use Carbon\CarbonImmutable;
+use App\Services\TimeService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
+use InvalidArgumentException;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
@@ -18,24 +19,13 @@ class GetCurrentTimeTool extends Tool
     /**
      * Handle the tool request.
      */
-    public function handle(Request $request): Response
+    public function handle(Request $request, TimeService $time): Response
     {
-        $timezone = $request->get('timezone', 'UTC');
-
-        if (! in_array($timezone, timezone_identifiers_list(), true)) {
-            return Response::error("Unknown timezone [{$timezone}]. Use an IANA identifier such as 'UTC', 'America/New_York', or 'Australia/Sydney'.");
+        try {
+            return Response::json($time->now((string) $request->get('timezone', 'UTC')));
+        } catch (InvalidArgumentException $e) {
+            return Response::error($e->getMessage());
         }
-
-        $now = CarbonImmutable::now($timezone);
-
-        return Response::json([
-            'timezone' => $timezone,
-            'datetime' => $now->toIso8601String(),
-            'unix_timestamp' => $now->getTimestamp(),
-            'utc_offset' => $now->format('P'),
-            'is_dst' => (bool) $now->format('I'),
-            'day_of_week' => $now->format('l'),
-        ]);
     }
 
     /**

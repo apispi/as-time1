@@ -2,10 +2,11 @@
 
 namespace App\Mcp\Tools;
 
-use Carbon\CarbonImmutable;
-use Carbon\Exceptions\InvalidFormatException;
+use App\Services\TimeService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
+use Illuminate\Validation\Rule;
+use InvalidArgumentException;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
@@ -19,35 +20,19 @@ class TimeDifferenceTool extends Tool
     /**
      * Handle the tool request.
      */
-    public function handle(Request $request): Response
+    public function handle(Request $request, TimeService $time): Response
     {
         $validated = $request->validate([
             'start' => ['required', 'string'],
             'end' => ['required', 'string'],
-            'unit' => ['sometimes', 'string', 'in:seconds,minutes,hours,days,weeks,months,years'],
+            'unit' => ['sometimes', 'string', Rule::in(TimeService::UNITS)],
         ]);
 
         try {
-            $start = CarbonImmutable::parse($validated['start']);
-            $end = CarbonImmutable::parse($validated['end']);
-        } catch (InvalidFormatException $e) {
-            return Response::error("Could not parse timestamp: {$e->getMessage()}. Use an ISO 8601 or 'YYYY-MM-DD HH:MM:SS' format.");
+            return Response::json($time->difference($validated['start'], $validated['end'], $validated['unit'] ?? null));
+        } catch (InvalidArgumentException $e) {
+            return Response::error($e->getMessage());
         }
-
-        $result = [
-            'start' => $start->toIso8601String(),
-            'end' => $end->toIso8601String(),
-            'human' => $start->diffForHumans($end, ['syntax' => CarbonImmutable::DIFF_ABSOLUTE, 'parts' => 3]),
-            'iso8601_duration' => $start->diff($end)->format('%rP%yY%mM%dDT%hH%iM%sS'),
-            'total_seconds' => $end->getTimestamp() - $start->getTimestamp(),
-        ];
-
-        if (isset($validated['unit'])) {
-            $unit = $validated['unit'];
-            $result[$unit] = $start->{'diffIn'.ucfirst($unit)}($end);
-        }
-
-        return Response::json($result);
     }
 
     /**
@@ -66,7 +51,7 @@ class TimeDifferenceTool extends Tool
                 ->required(),
             'unit' => $schema->string()
                 ->description('Optionally express the total difference in a single unit.')
-                ->enum(['seconds', 'minutes', 'hours', 'days', 'weeks', 'months', 'years']),
+                ->enum(TimeService::UNITS),
         ];
     }
 }

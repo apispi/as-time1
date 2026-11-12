@@ -2,10 +2,10 @@
 
 namespace App\Mcp\Tools;
 
-use Carbon\CarbonImmutable;
-use Carbon\Exceptions\InvalidFormatException;
+use App\Services\TimeService;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
+use InvalidArgumentException;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
@@ -19,7 +19,7 @@ class ConvertTimeTool extends Tool
     /**
      * Handle the tool request.
      */
-    public function handle(Request $request): Response
+    public function handle(Request $request, TimeService $time): Response
     {
         $validated = $request->validate([
             'time' => ['required', 'string'],
@@ -28,26 +28,10 @@ class ConvertTimeTool extends Tool
         ]);
 
         try {
-            $source = CarbonImmutable::parse($validated['time'], $validated['from_tz']);
-        } catch (InvalidFormatException) {
-            return Response::error("Could not parse time [{$validated['time']}]. Use an ISO 8601 or 'YYYY-MM-DD HH:MM:SS' format.");
+            return Response::json($time->convert($validated['time'], $validated['from_tz'], $validated['to_tz']));
+        } catch (InvalidArgumentException $e) {
+            return Response::error($e->getMessage());
         }
-
-        $converted = $source->setTimezone($validated['to_tz']);
-
-        return Response::json([
-            'source' => [
-                'timezone' => $validated['from_tz'],
-                'datetime' => $source->toIso8601String(),
-                'is_dst' => (bool) $source->format('I'),
-            ],
-            'converted' => [
-                'timezone' => $validated['to_tz'],
-                'datetime' => $converted->toIso8601String(),
-                'is_dst' => (bool) $converted->format('I'),
-            ],
-            'offset_difference' => sprintf('%+g hours', ($converted->utcOffset() - $source->utcOffset()) / 60),
-        ]);
     }
 
     /**

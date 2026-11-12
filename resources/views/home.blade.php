@@ -165,8 +165,12 @@
             <nav class="nav-links" aria-label="Main navigation">
                 <a href="#features">Features</a>
                 <a href="#tools">Tools</a>
-                <a href="#quickstart">Quick Start</a>
-                <a href="#quickstart" class="btn">Get Started</a>
+                <a href="{{ route('docs') }}">Docs</a>
+                @auth
+                    <a href="{{ route('account') }}" class="btn">Account</a>
+                @else
+                    <a href="{{ route('login') }}" class="btn">Sign in</a>
+                @endauth
             </nav>
         </div>
     </header>
@@ -272,6 +276,7 @@
   }
 }</code></pre>
                 </div>
+                <p class="section-sub" style="margin-top: 1.5rem; margin-bottom: 0;">Client-specific steps and the REST API are in the <a href="{{ route('docs') }}" style="color: var(--accent);">documentation</a>.</p>
             </div>
         </section>
 
@@ -280,7 +285,7 @@
                 <div class="cta-panel">
                     <h2>Give your agent a watch</h2>
                     <p>Free to use, no API key required. Connect your MCP client and start asking about time.</p>
-                    <a href="#quickstart" class="btn">Get Started</a>
+                    <a href="{{ route('docs') }}" class="btn">Read the docs</a>
                 </div>
             </div>
         </section>
@@ -292,7 +297,7 @@
             <nav class="footer-links" aria-label="Footer navigation">
                 <a href="#features">Features</a>
                 <a href="#tools">Tools</a>
-                <a href="#quickstart">Quick Start</a>
+                <a href="{{ route('docs') }}">Docs</a>
                 <a href="/up">Status</a>
             </nav>
         </div>
