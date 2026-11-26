@@ -49,9 +49,13 @@ class TimeController extends Controller
         ));
     }
 
-    public function timezones(): JsonResponse
+    public function timezones(Request $request): JsonResponse
     {
-        $timezones = $this->time->timezones();
+        $validated = $request->validate([
+            'search' => ['sometimes', 'nullable', 'string', 'max:64'],
+        ]);
+
+        $timezones = $this->time->timezones($validated['search'] ?? null);
 
         return response()->json(['count' => count($timezones), 'timezones' => $timezones]);
     }

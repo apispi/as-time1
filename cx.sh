@@ -11,8 +11,15 @@
 # ⚠ Runs on your LOCAL machine only. Its counterpart on the server is
 #   deploy.sh (pull + dependencies + migrate + caches).
 #
-# Requires a vars.sh next to it defining REMOTE, PROJECT and APP_SSH.
-# See vars.sh.example. vars.sh is gitignored.
+# Version 1.2
+# - 27 checks the server .env parses; 20 runs that check before deploying,
+#   because an unquoted value with a space 500s the site and stops a
+#   deploy halfway (the copy of deploy.sh on the server may be too old to
+#   catch it itself)
+#
+# Version 1.1
+# - settings live in this file (overridable from the environment); vars.sh
+#   is gone
 #
 # Version 1.0
 # - the routine operations this project actually has: deploy, what's-live,
@@ -22,15 +29,15 @@
 
 cd "$(dirname "$0")" || exit 1
 
-if [ ! -f ./vars.sh ]; then
-  echo "vars.sh not found next to cx.sh — copy vars.sh.example to vars.sh and fill it in."
-  exit 1
-fi
-source ./vars.sh
-
+# Settings. Each can be overridden from the environment for one run, e.g.
+#   REMOTE=user@host APP_SSH="ssh -p 18765" ./cx.sh 22
+PROJECT="${PROJECT:-time.apispi.com}"        # directory under ~/www/ on the server
+REMOTE="${REMOTE:-as}"                       # SSH alias from ~/.ssh/config (user, host, port)
+APP_SSH="${APP_SSH:-ssh -x}"
 REMOTE_APP="${REMOTE_APP:-www/$PROJECT}"     # app root on the server, relative to ~
-APP_URL="${APP_URL:-https://$PROJECT}"
-APP_SSH="${APP_SSH:-ssh}"
+APP_URL="${APP_URL:-https://$PROJECT}"       # what the health checks (30, 38) request
+# "user:password" for the hosting password protection, if it is on. A secret,
+# so it comes from the environment only and is never written in this file.
 HTTP_AUTH="${HTTP_AUTH:-}"
 
 # This script drives the server from outside; on the server it would ssh to
@@ -74,10 +81,26 @@ site_curl() {
 # otherwise reads as the app being broken.
 explain_status() {
   if [ "$1" = "401" ] && [ -z "$HTTP_AUTH" ]; then
-    echo "  401 is the hosting password protection, not the app. Set HTTP_AUTH"
-    echo "  in vars.sh to check through it. MCP clients and Google's OAuth"
-    echo "  redirect are blocked by it in the same way."
+    echo "  401 is the hosting password protection, not the app. To check through"
+    echo "  it: HTTP_AUTH=user:password ./cx.sh $SELECTION. MCP clients and Google's"
+    echo "  OAuth redirect are blocked by it in the same way."
   fi
+}
+
+# The server .env lines Laravel cannot parse: unquoted values with a space.
+# Prints them and returns 1 if there are any.
+check_env() {
+  local bad
+  bad=$(remote "test -f .env || { echo 'MISSING'; exit 0; }; grep -nE '^[A-Za-z_][A-Za-z0-9_]*=[^\"\x27#]*[^\"\x27#[:space:]][[:space:]]+[^#[:space:]]' .env" 2>/dev/null)
+  if [ "$bad" = "MISSING" ]; then
+    echo "✗ the server has no .env"; return 1
+  elif [ -n "$bad" ]; then
+    echo "✗ server .env has unquoted values containing spaces (the site 500s until fixed):"
+    echo "$bad" | sed -E 's/^([0-9]+):([^=]+)=(.*)$/    line \1:  \2=\3   →   \2="\3"/'
+    echo "  Fix on the server:  ssh $REMOTE, cd ~/$REMOTE_APP, edit .env"
+    return 1
+  fi
+  echo "✓ server .env parses"
 }
 
 # Ask for PARAM2 only when the chosen option needs it.
@@ -119,6 +142,7 @@ else
   echo "24 : CACHES: refresh config/routes/views"
   echo "25 : CACHES: clear everything (when a cached value looks stale)"
   echo "26 : COMPOSER: install production dependencies"
+  echo "27 : ENV: check the server .env parses"
   echo ----------------------------------------------
   echo DIAGNOSE
   echo "30 : HEALTH: $APP_URL and /up"
@@ -170,6 +194,8 @@ case "$SELECTION" in
     confirm "Deploying now would publish the previous commit."
   fi
   echo "Local HEAD : $(git log --oneline -1)"
+  echo
+  check_env || { echo "  Nothing was deployed."; log_history "Deploy refused on $PROJECT: bad .env"; exit 1; }
   echo
   # A deploy.sh that is new or changed arrives with the pull it performs, so
   # the copy on the server is one commit behind. Pull first when it is absent.
@@ -231,6 +257,12 @@ case "$SELECTION" in
   # reinstalling without a deploy.
   remote_tty "composer install --no-dev --optimize-autoloader --no-interaction"
   log_history "Installed composer dependencies on $PROJECT"
+  ;;
+
+
+  "27" )
+  banner "ENV: check on $PROJECT"
+  check_env || exit 1
   ;;
 
 

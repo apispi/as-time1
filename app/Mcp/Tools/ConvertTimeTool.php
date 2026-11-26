@@ -11,9 +11,13 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Attributes\Name;
 use Laravel\Mcp\Server\Tool;
+use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
 #[Name('convert_time')]
 #[Description('Convert a timestamp from one IANA timezone to another, with daylight-saving awareness.')]
+#[IsReadOnly]
+#[IsIdempotent]
 class ConvertTimeTool extends Tool
 {
     /**

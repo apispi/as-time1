@@ -28,6 +28,5 @@ Homestead.json
 Homestead.yaml
 Thumbs.db
 
-# cx.sh local config (host/account details) and its working files
-/vars.sh
+# cx.sh working files (history log)
 /log/

@@ -178,7 +178,7 @@
     <main>
         <section class="hero">
             <div class="container">
-                <span class="badge"><span class="dot" aria-hidden="true"></span> Model Context Protocol · v1.0</span>
+                <span class="badge"><span class="dot" aria-hidden="true"></span> Model Context Protocol · v1.1</span>
                 <h1>Accurate time for your <span class="accent">AI agents</span></h1>
                 <p class="lede">
                     Language models don't know what time it is. MCP Time Service gives any
@@ -221,7 +221,7 @@
                             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
                         </span>
                         <h3>Standard MCP transport</h3>
-                        <p>Speaks plain Model Context Protocol over stdio or HTTP. Works with Claude, IDE agents, and any MCP client.</p>
+                        <p>Speaks plain Model Context Protocol over streamable HTTP — one URL, nothing to install. Works with Claude, IDE agents, and any MCP client.</p>
                     </div>
                     <div class="card">
                         <span class="icon" aria-hidden="true">
@@ -237,7 +237,7 @@
         <section id="tools">
             <div class="container">
                 <h2>Available tools</h2>
-                <p class="section-sub">Three focused tools your agent can call through MCP.</p>
+                <p class="section-sub">Four focused, read-only tools your agent can call through MCP.</p>
                 <div class="grid">
                     <div class="card tool">
                         <code class="name">get_current_time</code>
@@ -253,6 +253,11 @@
                         <code class="name">time_difference</code>
                         <p>Computes the elapsed duration between two timestamps in human or machine format.</p>
                         <p class="args">Args: <code>start</code>, <code>end</code>, <code>unit</code> (optional)</p>
+                    </div>
+                    <div class="card tool">
+                        <code class="name">list_timezones</code>
+                        <p>Finds the exact IANA identifier for a city or region, so the other tools get valid input.</p>
+                        <p class="args">Args: <code>search</code> (optional, e.g. <code>new york</code>)</p>
                     </div>
                 </div>
             </div>

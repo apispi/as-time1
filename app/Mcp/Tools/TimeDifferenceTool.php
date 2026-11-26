@@ -12,9 +12,13 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Attributes\Name;
 use Laravel\Mcp\Server\Tool;
+use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
+use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
 #[Name('time_difference')]
 #[Description('Compute the elapsed duration between two timestamps, in human-readable and machine formats.')]
+#[IsReadOnly]
+#[IsIdempotent]
 class TimeDifferenceTool extends Tool
 {
     /**

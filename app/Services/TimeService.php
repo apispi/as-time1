@@ -88,11 +88,22 @@ class TimeService
     }
 
     /**
+     * Every accepted IANA identifier, optionally narrowed to those containing
+     * $search (case-insensitive; spaces match underscores, so "new york"
+     * finds America/New_York).
+     *
      * @return list<string>
      */
-    public function timezones(): array
+    public function timezones(?string $search = null): array
     {
-        return timezone_identifiers_list();
+        $all = timezone_identifiers_list();
+        $needle = str_replace(' ', '_', trim((string) $search));
+
+        if ($needle === '') {
+            return $all;
+        }
+
+        return array_values(array_filter($all, fn (string $tz) => stripos($tz, $needle) !== false));
     }
 
     private function assertTimezone(string $timezone): void

@@ -19,6 +19,20 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+# A value with a space must be quoted in .env (APP_NAME="MCP Time"). Unquoted,
+# Laravel cannot parse the file and every request is a 500 — and so is every
+# artisan command below, leaving a deploy half done. Check before pulling.
+BAD_ENV=$(grep -nE '^[A-Za-z_][A-Za-z0-9_]*=[^"'"'"'#]*[^"'"'"'#[:space:]][[:space:]]+[^#[:space:]]' .env 2>/dev/null || true)
+if [ ! -f .env ]; then
+    echo "✗ .env is missing — copy .env.example to .env, fill it in, then re-run."
+    exit 1
+elif [ -n "$BAD_ENV" ]; then
+    echo "✗ .env has unquoted values containing spaces — wrap each value in double quotes:"
+    echo "$BAD_ENV" | sed -E 's/^([0-9]+):([^=]+)=(.*)$/    line \1:  \2=\3   →   \2="\3"/'
+    echo "  Nothing was deployed."
+    exit 1
+fi
+
 # SiteGround edits tracked files in place (public_html/.htaccess, for password
 # protection and PHP version). That drift is expected and the pull keeps it;
 # it is printed so that a pull which stops on a conflict explains itself.

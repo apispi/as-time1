@@ -115,10 +115,11 @@ td:first-child { white-space: nowrap; }
                     <tr><td><code>get_current_time</code></td><td><code>timezone</code> (optional, default UTC)</td><td>Current time in that timezone</td></tr>
                     <tr><td><code>convert_time</code></td><td><code>time</code>, <code>from_tz</code>, <code>to_tz</code></td><td>The same instant in both timezones</td></tr>
                     <tr><td><code>time_difference</code></td><td><code>start</code>, <code>end</code>, <code>unit</code> (optional)</td><td>Elapsed duration between two timestamps</td></tr>
+                    <tr><td><code>list_timezones</code></td><td><code>search</code> (optional)</td><td>Matching IANA identifiers</td></tr>
                 </tbody>
             </table>
         </div>
-        <p>Each tool returns the same JSON as its REST endpoint below.</p>
+        <p>Each tool returns the same JSON as its REST endpoint below. All four are marked read-only, so clients that honour MCP tool hints can run them without asking for approval.</p>
 
         <h2 id="api">REST API</h2>
         <p>For scripts, backends and anything that is not an MCP client. All endpoints are <code>GET</code>, take query parameters and return JSON. Cross-origin requests are allowed, so the API can be called from a browser.</p>
@@ -199,11 +200,17 @@ td:first-child { white-space: nowrap; }
 }</code></pre>
 
         <div class="endpoint" id="api-timezones"><span class="verb">GET</span><h3>/timezones</h3></div>
-        <p>Every timezone identifier the service accepts. No parameters.</p>
-        <pre><code>curl '{{ $api }}/timezones'</code></pre>
+        <p>Every timezone identifier the service accepts, or those matching a search.</p>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Parameter</th><th>Required</th><th>Description</th></tr></thead>
+                <tbody><tr><td><code>search</code></td><td>No</td><td>Case-insensitive text to match, e.g. <code>sydney</code> or <code>new york</code>. Spaces match underscores.</td></tr></tbody>
+            </table>
+        </div>
+        <pre><code>curl '{{ $api }}/timezones?search=new%20york'</code></pre>
         <pre><code>{
-  "count": 419,
-  "timezones": ["Africa/Abidjan", "Africa/Accra", "…"]
+  "count": 1,
+  "timezones": ["America/New_York"]
 }</code></pre>
 
         <h2 id="errors">Errors and limits</h2>

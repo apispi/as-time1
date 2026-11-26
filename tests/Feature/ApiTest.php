@@ -100,4 +100,30 @@ class ApiTest extends TestCase
             'arguments' => ['time' => '2026-07-17 09:30:00', 'from_tz' => 'Australia/Sydney', 'to_tz' => 'America/New_York'],
         ]], $headers)->assertOk()->assertSee('2026-07-16T19:30:00-04:00');
     }
+
+    public function test_timezone_search_matches_spaces_and_case(): void
+    {
+        $this->getJson('/api/v1/timezones?search=new%20york')
+            ->assertOk()
+            ->assertExactJson(['count' => 1, 'timezones' => ['America/New_York']]);
+
+        $this->getJson('/api/v1/timezones?search=zzz')->assertOk()->assertJson(['count' => 0]);
+    }
+
+    public function test_mcp_list_timezones_tool_and_read_only_hints(): void
+    {
+        $headers = ['Accept' => 'application/json, text/event-stream'];
+
+        $tools = collect($this->postJson('/mcp', ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/list'], $headers)
+            ->assertOk()->json('result.tools'))->keyBy('name');
+
+        $this->assertCount(4, $tools);
+        foreach ($tools as $name => $tool) {
+            $this->assertTrue($tool['annotations']['readOnlyHint'] ?? false, "$name should be read-only");
+        }
+
+        $this->postJson('/mcp', ['jsonrpc' => '2.0', 'id' => 2, 'method' => 'tools/call', 'params' => [
+            'name' => 'list_timezones', 'arguments' => ['search' => 'sydney'],
+        ]], $headers)->assertOk()->assertSee('Australia\\/Sydney', false);
+    }
 }
