@@ -42,6 +42,11 @@ if [ -n "$DRIFT" ]; then
     echo "$DRIFT" | sed 's/^/    /'
 fi
 
+# A server-side edit that has since been committed (e.g. the AddHandler line
+# in public_html/.htaccess) still blocks the pull, even when the two are
+# identical. Drop the local copy only when it matches upstream exactly.
+git fetch --quiet && for f in $(git diff --name-only); do [ "$(git hash-object "$f")" = "$(git rev-parse "@{u}:$f" 2>/dev/null)" ] && git checkout -- "$f" && echo "ℹ $f: server edit is now in the repo — kept the repo copy"; done; true
+
 echo "→ git pull"
 LOCK_BEFORE=$(git rev-parse HEAD:composer.lock 2>/dev/null || echo none)
 # --ff-only: the server never commits, so anything but a fast-forward means

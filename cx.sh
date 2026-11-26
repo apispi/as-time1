@@ -197,6 +197,9 @@ case "$SELECTION" in
   echo
   check_env || { echo "  Nothing was deployed."; log_history "Deploy refused on $PROJECT: bad .env"; exit 1; }
   echo
+  # Server edits that are now committed block the pull even when identical.
+  # The server's deploy.sh may predate handling that, so do it here first.
+  remote "git fetch --quiet && for f in \$(git diff --name-only); do [ \"\$(git hash-object \"\$f\")\" = \"\$(git rev-parse \"@{u}:\$f\" 2>/dev/null)\" ] && git checkout -- \"\$f\" && echo \"ℹ \$f: server edit is now in the repo — kept the repo copy\"; done; true"
   # A deploy.sh that is new or changed arrives with the pull it performs, so
   # the copy on the server is one commit behind. Pull first when it is absent.
   if remote_tty "test -x ./deploy.sh || { echo '→ first run: fetching deploy.sh'; git pull --ff-only; }; ./deploy.sh"; then
