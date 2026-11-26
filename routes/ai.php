@@ -3,4 +3,4 @@
 use App\Mcp\Servers\TimeServer;
 use Laravel\Mcp\Facades\Mcp;
 
-Mcp::web('/mcp', TimeServer::class);
+Mcp::web('/mcp', TimeServer::class)->middleware('usage:mcp');

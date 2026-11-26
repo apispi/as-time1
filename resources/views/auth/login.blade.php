@@ -10,7 +10,7 @@
             <h1>Sign in</h1>
             <p class="sub">Welcome back to MCP Time Service.</p>
 
-            @include('auth._google')
+            @include('auth._social')
 
             <form method="POST" action="{{ route('login') }}" novalidate>
                 @csrf

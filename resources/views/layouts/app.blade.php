@@ -81,7 +81,10 @@
                 <a href="/#tools">Tools</a>
                 <a href="{{ route('docs') }}">Docs</a>
                 @auth
-                    <a href="{{ route('account') }}" class="btn">Account</a>
+                    @if (auth()->user()->is_admin)
+                        <a href="{{ route('admin.overview') }}">Admin</a>
+                    @endif
+                    <a href="{{ route('dashboard') }}" class="btn">Dashboard</a>
                 @else
                     <a href="{{ route('login') }}" class="btn">Sign in</a>
                 @endauth

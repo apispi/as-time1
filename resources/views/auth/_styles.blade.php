@@ -21,5 +21,7 @@
 .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 .btn-google { background: #fff; color: #1f1f1f; font-weight: 500; }
 .btn-google:hover { background: #f1f5f9; }
+.btn-apispi { background: #1E3A8A; color: #fff; font-weight: 500; }
+.btn-apispi:hover { background: #1D4ED8; }
 .alt { text-align: center; color: var(--muted); font-size: 0.9rem; margin-top: 1.5rem; }
 .alt a { color: var(--accent); }

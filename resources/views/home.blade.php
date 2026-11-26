@@ -167,7 +167,7 @@
                 <a href="#tools">Tools</a>
                 <a href="{{ route('docs') }}">Docs</a>
                 @auth
-                    <a href="{{ route('account') }}" class="btn">Account</a>
+                    <a href="{{ route('dashboard') }}" class="btn">Dashboard</a>
                 @else
                     <a href="{{ route('login') }}" class="btn">Sign in</a>
                 @endauth

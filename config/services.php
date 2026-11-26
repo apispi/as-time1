@@ -37,6 +37,16 @@ return [
         'redirect' => env('GOOGLE_REDIRECT_URI', '/auth/google/callback'),
     ],
 
+    // "Sign in with ApiSpi". Credentials come from the apispi.com admin
+    // (Grounding apps → issue credentials), with <site>/auth/apispi/callback
+    // as the redirect URI.
+    'apispi' => [
+        'client_id' => env('APISPI_CLIENT_ID'),
+        'client_secret' => env('APISPI_CLIENT_SECRET'),
+        'redirect' => env('APISPI_REDIRECT_URI', '/auth/apispi/callback'),
+        'base_url' => env('APISPI_OAUTH_URL', 'https://apispi.com'),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

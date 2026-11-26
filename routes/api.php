@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Route;
 | are not MCP clients. No key required; rate-limited per IP ("api" limiter
 | in AppServiceProvider). Documented at /docs.
 */
-Route::prefix('v1')->middleware('throttle:api')->group(function () {
+Route::prefix('v1')->middleware(['throttle:api', 'usage:api'])->group(function () {
     Route::get('/time', [TimeController::class, 'now']);
     Route::get('/convert', [TimeController::class, 'convert']);
     Route::get('/difference', [TimeController::class, 'difference']);

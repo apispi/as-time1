@@ -10,7 +10,7 @@
             <h1>Create your account</h1>
             <p class="sub">The time tools stay free and need no account; this is for what comes next.</p>
 
-            @include('auth._google')
+            @include('auth._social')
 
             <form method="POST" action="{{ route('register') }}" novalidate>
                 @csrf

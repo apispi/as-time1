@@ -3,8 +3,11 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\URL;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\InvalidStateException;
 use Laravel\Socialite\Two\User as GoogleUser;
@@ -18,7 +21,10 @@ class AuthTest extends TestCase
     {
         parent::setUp();
 
-        config(['services.google.client_id' => 'id', 'services.google.client_secret' => 'secret']);
+        config([
+            'services.google.client_id' => 'id', 'services.google.client_secret' => 'secret',
+            'services.apispi.client_id' => 'aid', 'services.apispi.client_secret' => 'asecret',
+        ]);
     }
 
     private function googleReturns(string $id, string $email, bool $verified = true, string $name = 'Ada Lovelace'): void
@@ -30,32 +36,87 @@ class AuthTest extends TestCase
         Socialite::shouldReceive('driver->user')->andReturn($user);
     }
 
+    private function apispiReturns(string $sub, string $email, bool $verified = true): void
+    {
+        $user = (new GoogleUser)->setRaw(['sub' => $sub, 'email_verified' => $verified])->map([
+            'id' => $sub, 'name' => 'Ada Lovelace', 'email' => $email,
+        ]);
+
+        Socialite::shouldReceive('driver->user')->andReturn($user);
+    }
+
     public function test_pages_render(): void
     {
-        $this->get('/login')->assertOk()->assertSee('Continue with Google');
+        $this->get('/login')->assertOk()->assertSee('Continue with Google')->assertSee('Continue with ApiSpi');
         $this->get('/register')->assertOk();
-        $this->get('/account')->assertRedirect('/login');
+        $this->get('/dashboard')->assertRedirect('/login');
     }
 
     public function test_google_button_is_hidden_until_configured(): void
     {
         config(['services.google.client_id' => null]);
 
-        $this->get('/login')->assertOk()->assertDontSee('Continue with Google');
-        $this->get('/auth/google/redirect')->assertRedirect('/login')->assertSessionHasErrors('google');
+        $this->get('/login')->assertOk()->assertDontSee('Continue with Google')->assertSee('Continue with ApiSpi');
+        $this->get('/auth/google/redirect')->assertRedirect('/login')->assertSessionHasErrors('social');
     }
 
-    public function test_register_creates_an_account_and_signs_in(): void
+    public function test_register_sends_a_verification_email_and_gates_the_dashboard(): void
     {
+        Notification::fake();
+
         $this->post('/register', [
             'name' => 'Ada', 'email' => 'ada@example.com',
             'password' => 'correct-horse', 'password_confirmation' => 'correct-horse',
-        ])->assertRedirect('/account');
+        ])->assertRedirect('/email/verify');
 
-        $this->assertAuthenticated();
         $user = User::where('email', 'ada@example.com')->firstOrFail();
+        $this->assertAuthenticatedAs($user);
+        $this->assertNull($user->email_verified_at);
         $this->assertTrue(Hash::check('correct-horse', $user->password));
-        $this->get('/account')->assertOk()->assertSee('ada@example.com')->assertSee('Password');
+        Notification::assertSentTo($user, VerifyEmail::class);
+
+        $this->get('/dashboard')->assertRedirect('/email/verify');
+        $this->get('/email/verify')->assertOk()->assertSee('ada@example.com');
+
+        $link = URL::temporarySignedRoute('verification.verify', now()->addHour(), ['id' => $user->id, 'hash' => sha1($user->email)]);
+        $this->get($link)->assertRedirect('/dashboard');
+
+        $this->assertNotNull($user->fresh()->email_verified_at);
+        $this->get('/dashboard')->assertOk()->assertSee('ada@example.com')->assertSee('Password');
+    }
+
+    public function test_a_tampered_or_foreign_verification_link_is_rejected(): void
+    {
+        $user = User::factory()->unverified()->create();
+        $other = User::factory()->unverified()->create();
+
+        $this->actingAs($user);
+        $this->get(URL::temporarySignedRoute('verification.verify', now()->addHour(), ['id' => $other->id, 'hash' => sha1($other->email)]))->assertForbidden();
+        $this->get(route('verification.verify', ['id' => $user->id, 'hash' => sha1($user->email)]))->assertForbidden();
+
+        $this->assertNull($user->fresh()->email_verified_at);
+    }
+
+    public function test_verification_email_can_be_resent(): void
+    {
+        Notification::fake();
+        $user = User::factory()->unverified()->create();
+
+        $this->actingAs($user)->post('/email/verification-notification')->assertSessionHas('status');
+
+        Notification::assertSentTo($user, VerifyEmail::class);
+    }
+
+    public function test_registering_over_a_pending_signup_replaces_it(): void
+    {
+        Notification::fake();
+        User::factory()->unverified()->create(['email' => 'ada@example.com', 'password' => 'squatter-pw']);
+
+        $this->post('/register', ['name' => 'Ada', 'email' => 'ada@example.com', 'password' => 'correct-horse', 'password_confirmation' => 'correct-horse'])
+            ->assertRedirect('/email/verify');
+
+        $this->assertSame(1, User::count());
+        $this->assertTrue(Hash::check('correct-horse', User::first()->password));
     }
 
     public function test_register_rejects_duplicates_and_weak_or_mismatched_passwords(): void
@@ -80,10 +141,10 @@ class AuthTest extends TestCase
         $this->post('/login', ['email' => $user->email, 'password' => 'wrong'])->assertSessionHasErrors('email');
         $this->assertGuest();
 
-        $this->post('/login', ['email' => $user->email, 'password' => 'correct-horse'])->assertRedirect('/account');
+        $this->post('/login', ['email' => $user->email, 'password' => 'correct-horse'])->assertRedirect('/dashboard');
         $this->assertAuthenticatedAs($user);
 
-        $this->get('/login')->assertRedirect('/account');
+        $this->get('/login')->assertRedirect('/dashboard');
 
         $this->post('/logout')->assertRedirect('/');
         $this->assertGuest();
@@ -102,14 +163,14 @@ class AuthTest extends TestCase
     {
         $this->googleReturns('g-1', 'Ada@Example.com');
 
-        $this->get('/auth/google/callback')->assertRedirect('/account');
+        $this->get('/auth/google/callback')->assertRedirect('/dashboard');
 
         $user = User::where('email', 'ada@example.com')->firstOrFail();
         $this->assertAuthenticatedAs($user);
         $this->assertSame('g-1', $user->google_id);
         $this->assertNull($user->password);
         $this->assertNotNull($user->email_verified_at);
-        $this->get('/account')->assertSee('Google');
+        $this->get('/dashboard')->assertSee('Google');
     }
 
     public function test_google_signs_in_a_returning_user_even_if_their_email_changed(): void
@@ -118,7 +179,7 @@ class AuthTest extends TestCase
         $user->forceFill(['google_id' => 'g-1'])->save();
         $this->googleReturns('g-1', 'new@example.com');
 
-        $this->get('/auth/google/callback')->assertRedirect('/account');
+        $this->get('/auth/google/callback')->assertRedirect('/dashboard');
 
         $this->assertAuthenticatedAs($user);
         $this->assertSame(1, User::count());
@@ -129,7 +190,7 @@ class AuthTest extends TestCase
         $user = User::factory()->create(['email' => 'ada@example.com', 'password' => 'correct-horse']);
         $this->googleReturns('g-1', 'ada@example.com');
 
-        $this->get('/auth/google/callback')->assertRedirect('/account');
+        $this->get('/auth/google/callback')->assertRedirect('/dashboard');
 
         $this->assertAuthenticatedAs($user);
         $this->assertSame('g-1', $user->fresh()->google_id);
@@ -142,7 +203,7 @@ class AuthTest extends TestCase
         $user = User::factory()->unverified()->create(['email' => 'ada@example.com', 'password' => 'attacker-pw']);
         $this->googleReturns('g-1', 'ada@example.com');
 
-        $this->get('/auth/google/callback')->assertRedirect('/account');
+        $this->get('/auth/google/callback')->assertRedirect('/dashboard');
 
         $this->assertNull($user->fresh()->password);
         $this->post('/logout');
@@ -155,7 +216,7 @@ class AuthTest extends TestCase
         User::factory()->create(['email' => 'ada@example.com']);
         $this->googleReturns('g-1', 'ada@example.com', verified: false);
 
-        $this->get('/auth/google/callback')->assertRedirect('/login')->assertSessionHasErrors('google');
+        $this->get('/auth/google/callback')->assertRedirect('/login')->assertSessionHasErrors('social');
 
         $this->assertGuest();
         $this->assertNull(User::first()->google_id);
@@ -165,7 +226,7 @@ class AuthTest extends TestCase
     {
         Socialite::shouldReceive('driver->user')->andThrow(new InvalidStateException);
 
-        $this->get('/auth/google/callback')->assertRedirect('/login')->assertSessionHasErrors('google');
+        $this->get('/auth/google/callback')->assertRedirect('/login')->assertSessionHasErrors('social');
         $this->assertGuest();
     }
 
@@ -175,5 +236,44 @@ class AuthTest extends TestCase
 
         $this->assertStringStartsWith('https://accounts.google.com/', $location);
         $this->assertStringContainsString(urlencode(url('/auth/google/callback')), $location);
+    }
+
+    public function test_apispi_creates_an_account_and_links_by_email(): void
+    {
+        $existing = User::factory()->create(['email' => 'ada@example.com', 'password' => 'correct-horse']);
+        $this->apispiReturns('42', 'ada@example.com');
+
+        $this->get('/auth/apispi/callback')->assertRedirect('/dashboard');
+
+        $this->assertAuthenticatedAs($existing);
+        $this->assertSame('42', $existing->fresh()->apispi_id);
+        $this->get('/dashboard')->assertSee('ApiSpi + Password');
+    }
+
+    public function test_apispi_with_an_unverified_email_is_refused(): void
+    {
+        $this->apispiReturns('42', 'ada@example.com', verified: false);
+
+        $this->get('/auth/apispi/callback')->assertRedirect('/login')->assertSessionHasErrors('social');
+        $this->assertGuest();
+        $this->assertSame(0, User::count());
+    }
+
+    public function test_apispi_redirect_uses_pkce_and_openid_scopes(): void
+    {
+        $location = $this->get('/auth/apispi/redirect')->assertRedirect()->headers->get('Location');
+        parse_str((string) parse_url($location, PHP_URL_QUERY), $q);
+
+        $this->assertStringStartsWith('https://apispi.com/oauth/authorize?', $location);
+        $this->assertSame('aid', $q['client_id']);
+        $this->assertSame('openid profile email', $q['scope']);
+        $this->assertSame('S256', $q['code_challenge_method']);
+        $this->assertNotEmpty($q['code_challenge']);
+        $this->assertSame(url('/auth/apispi/callback'), $q['redirect_uri']);
+    }
+
+    public function test_unknown_provider_is_a_404(): void
+    {
+        $this->get('/auth/github/redirect')->assertNotFound();
     }
 }

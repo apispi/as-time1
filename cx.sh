@@ -143,6 +143,7 @@ else
   echo "25 : CACHES: clear everything (when a cached value looks stale)"
   echo "26 : COMPOSER: install production dependencies"
   echo "27 : ENV: check the server .env parses"
+  echo "28 : ADMIN: grant admin access to a user (by email)"
   echo ----------------------------------------------
   echo DIAGNOSE
   echo "30 : HEALTH: $APP_URL and /up"
@@ -266,6 +267,14 @@ case "$SELECTION" in
   "27" )
   banner "ENV: check on $PROJECT"
   check_env || exit 1
+  ;;
+
+
+  "28" )
+  banner "ADMIN: grant on $PROJECT"
+  need_param "Email of an existing, signed-up user"
+  remote "php artisan user:admin '$PARAM2'"
+  log_history "Granted admin to $PARAM2 on $PROJECT"
   ;;
 
 
